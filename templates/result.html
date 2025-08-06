@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><title>작업 결과</title></head>
+<body>
+  <h1>작업 리포트</h1>
+
+  {% if report.status == 'Running' %}
+    <p>🔄 작업이 진행 중입니다...</p>
+  {% else %}
+    <p>✅ 작업이 완료되었습니다!</p>
+  {% endif %}
+
+  <p>작업 ID: {{ report.job_id }}</p>
+  <p>공급자: {{ report.provider }}</p>
+  <p>시작 시간: {{ report.start_time }}</p>
+</body>
+</html>

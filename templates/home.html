@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>공급자 목록</title>
+</head>
+<body>
+  <h1>공급 가능한 서버 목록</h1>
+
+  <!-- ✅ 로그인 상태에 따라 버튼 분기 -->
+  <div style="margin-bottom: 20px;">
+    {% if session.get('user_id') %}
+      <p>환영합니다, {{ session.get('username') }}님!</p>
+      <form action="{{ url_for('logout') }}" method="post" style="display:inline;">
+        <button type="submit">로그아웃</button>
+      </form>
+    {% else %}
+      <a href="{{ url_for('html_login') }}">로그인</a> |
+      <a href="{{ url_for('html_register') }}">회원가입</a>
+    {% endif %}
+  </div>
+
+  <!-- 공급자 리스트 -->
+  <div>
+    {% for p in providers %}
+      <div style="border:1px solid #ccc; padding:10px; margin:10px;">
+        <h2>{{ p.name }}</h2>
+        <p>CPU 여유율: {{ p.cpu_free }}%</p>
+        <p>RAM 여유량: {{ p.ram_free }} GiB</p>
+        <p>상태: {{ p.status }}</p>
+        <p>IP: {{ p.ip_address }}</p>
+        <form action="/provider/{{ p.id }}" method="get">
+          <button type="submit">상세보기</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+</body>
+</html>

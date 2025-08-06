@@ -1,10 +1,14 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from flask import render_template, redirect, request
+from datetime import datetime
+from uuid import uuid4
+import json
+import os
 
 app = Flask(__name__)
 CORS(app)
+app.secret_key = 'mutualcloud-very-secret-key'
 
 # DB 연결 설정
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mutualcloud.db'
@@ -17,43 +21,22 @@ class User(db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False)
     password = db.Column(db.String(128), nullable=False)
 
-# 기본 라우터
+# Provider 모델
+class Provider(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), nullable=False)
+    cpu_free = db.Column(db.Float, nullable=False)
+    ram_free = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(16), nullable=False)
+    ip_address = db.Column(db.String(64), nullable=True)
+
+# 홈 페이지 (공급자 리스트)
 @app.route('/')
 def home():
-    return "Mutual Cloud 서버 실행 중!"
+    providers = Provider.query.all()
+    return render_template('home.html', providers=providers)
 
-# 회원가입 API
-@app.route('/api/register', methods=['POST'])
-def register():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-
-    if not username or not password:
-        return jsonify({'error': '빈칸이 있어요'}), 400
-
-    if User.query.filter_by(username=username).first():
-        return jsonify({'error': '이미 존재하는 사용자'}), 409
-
-    new_user = User(username=username, password=password)
-    db.session.add(new_user)
-    db.session.commit()
-    return jsonify({'message': '회원가입 성공!'}), 201
-
-# 로그인 API
-@app.route('/api/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-
-    user = User.query.filter_by(username=username, password=password).first()
-    if user:
-        return jsonify({'message': '로그인 성공', 'userId': user.id}), 200
-    else:
-        return jsonify({'error': '로그인 실패'}), 401
-
-# HTML용 회원가입 페이지
+# HTML 회원가입
 @app.route('/register', methods=['GET', 'POST'])
 def html_register():
     if request.method == 'POST':
@@ -66,12 +49,11 @@ def html_register():
         new_user = User(username=username, password=password)
         db.session.add(new_user)
         db.session.commit()
-        return "회원가입 성공!"
+        return redirect('/login')
 
     return render_template('register.html')
 
-
-# HTML용 로그인 페이지
+# HTML 로그인
 @app.route('/login', methods=['GET', 'POST'])
 def html_login():
     if request.method == 'POST':
@@ -80,11 +62,60 @@ def html_login():
 
         user = User.query.filter_by(username=username, password=password).first()
         if user:
-            return f"{username}님 로그인 성공!"
+            session['user_id'] = user.id
+            session['username'] = user.username
+            return redirect('/')
         else:
             return "로그인 실패"
 
     return render_template('login.html')
+
+# 공급자 상세 페이지
+@app.route('/provider/<int:provider_id>')
+def provider_detail(provider_id):
+    provider = Provider.query.get_or_404(provider_id)
+    return render_template('prov-detail.html', provider=provider)
+
+# 작업 요청 (로그인 필수)
+@app.route('/submit_job/<int:provider_id>', methods=['POST'])
+def submit_job(provider_id):
+    if 'user_id' not in session:
+        return redirect(url_for('html_login'))
+
+    job_id = str(uuid4())[:8]
+    provider = Provider.query.get_or_404(provider_id)
+
+    # 결과 저장 경로 생성
+    os.makedirs('reports', exist_ok=True)
+
+    report_data = {
+        "job_id": job_id,
+        "provider": provider.name,
+        "status": "Running",
+        "start_time": datetime.now().isoformat()
+    }
+
+    with open(f"reports/{job_id}.json", "w") as f:
+        json.dump(report_data, f)
+
+    return redirect(url_for('result', job_id=job_id))
+
+# 결과 보기
+@app.route('/result/<job_id>')
+def result(job_id):
+    try:
+        with open(f"reports/{job_id}.json", "r") as f:
+            report = json.load(f)
+    except FileNotFoundError:
+        return "리포트를 찾을 수 없습니다", 404
+
+    return render_template('result.html', report=report)
+
+# 로그아웃
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return redirect('/')
 
 # 서버 실행
 if __name__ == '__main__':

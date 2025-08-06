@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>공급자 상세</title>
+</head>
+<body>
+  <h1>{{ provider.name }} 서버 상세정보</h1>
+  <p>CPU 여유율: {{ provider.cpu_free }}%</p>
+  <p>RAM 여유량: {{ provider.ram_free }} GiB</p>
+  <p>상태: {{ provider.status }}</p>
+  <p>IP: {{ provider.ip_address }}</p>
+
+  {% if session.get('user_id') %}
+    <form action="{{ url_for('submit_job', provider_id=provider.id) }}" method="post">
+      <button type="submit">이 서버로 작업 요청</button>
+    </form>
+  {% else %}
+    <p style="color: gray;">※ 작업 요청은 로그인 후 이용 가능합니다</p>
+    <a href="{{ url_for('html_login') }}">🔐 로그인하러 가기</a>
+  {% endif %}
+</body>
+</html>
