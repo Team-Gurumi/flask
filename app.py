@@ -5,6 +5,12 @@ from datetime import datetime
 from uuid import uuid4
 import json
 import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()  # .env 로드
+FASTAPI_BASE_URL = os.getenv("FASTAPI_BASE_URL", "http://localhost:8000")
+FASTAPI_TIMEOUT = 120  # 로그 대기 타임아웃(초)
 
 app = Flask(__name__)
 CORS(app)
@@ -47,7 +53,7 @@ def html_register():
 
     # POST → 회원 생성
     username = request.form['username'].strip()
-    password = request.form['password']  # 실제로는 해시 권장
+    password = request.form['password']
     if not username or not password:
         return "유효하지 않은 입력", 400
     if User.query.filter_by(username=username).first():
@@ -71,6 +77,7 @@ def login():
     user = User.query.filter_by(username=username).first()
     if user and user.password == password:
         session['user_id'] = user.id
+        session['username'] = user.username
         return redirect(url_for('home'))
     else:
         return "로그인 실패", 401
@@ -148,10 +155,10 @@ def register_provider():
     return jsonify({'message': '등록 완료'}), 201
 
 # 로그아웃
-@app.route('/logout', methods=['POST'])
+@app.route('/logout', methods=['GET', 'POST'])
 def logout():
     session.clear()
-    return redirect('/')
+    return redirect(url_for('home'))
 
 # 실행
 if __name__ == '__main__':
