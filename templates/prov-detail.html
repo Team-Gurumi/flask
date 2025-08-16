@@ -1,22 +1,56 @@
+<!-- /templates/prov-detail.html -->
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
+  <meta charset="UTF-8" />
   <title>공급자 상세</title>
+  <style>
+    .box { border: 1px solid #ccc; padding: 12px; border-radius: 6px; }
+    .row { margin-top: 8px; }
+    .w-360 { width: 360px; }
+    .btn { padding: 8px 12px; }
+  </style>
 </head>
 <body>
   <h1>{{ provider.name }} 서버 상세정보</h1>
-  <p>CPU 여유율: {{ provider.cpu_free }}%</p>
-  <p>RAM 여유량: {{ provider.ram_free }} GiB</p>
-  <p>상태: {{ provider.status }}</p>
-  <p>IP: {{ provider.ip_address }}</p>
+
+  <div class="box">
+    <p>CPU 여유율: {{ provider.cpu_free }}%</p>
+    <p>RAM 여유량: {{ provider.ram_free }} GiB</p>
+    <p>상태: {{ provider.status }}</p>
+    <p>IP: {{ provider.ip_address }}</p>
+  </div>
+
+  <div class="row">
+    <a href="{{ url_for('home') }}">← 홈으로</a>
+  </div>
 
   {% if session.get('user_id') %}
-    <form action="{{ url_for('submit_job', provider_id=provider.id) }}" method="post">
-      <button type="submit">이 서버로 작업 요청</button>
+    <h2 class="row">이 서버로 작업 요청</h2>
+    <!-- 작업 요청 폼: Flask가 FastAPI에 프록시 호출 -->
+    <form action="{{ url_for('submit_job', provider_id=provider.id) }}" method="post" class="box">
+      <div class="row">
+        <label for="image"><strong>컨테이너 이미지</strong></label><br />
+        <input id="image" name="image" class="w-360" value="alpine:3.19" />
+      </div>
+
+      <div class="row">
+        <label for="script"><strong>실행 스크립트</strong></label><br />
+        <textarea id="script" name="script" rows="3" class="w-360" placeholder="예: echo start; sleep 2; echo done"></textarea>
+      </div>
+
+      <div class="row">
+        <label for="env"><strong>환경 변수</strong> (KEY=VALUE 줄바꿈 구분)</label><br />
+        <textarea id="env" name="env" rows="3" class="w-360" placeholder="FOO=BAR&#10;HELLO=WORLD"></textarea>
+      </div>
+
+      <div class="row">
+        <button type="submit" class="btn">작업 요청 보내기</button>
+      </div>
     </form>
   {% else %}
-    <p style="color: gray;">※ 작업 요청은 로그인 후 이용 가능합니다</p>
-    <a href="{{ url_for('html_login') }}">🔐 로그인하러 가기</a>
+    <p class="row" style="color: gray;">작업 요청은 로그인 후 이용 가능합니다.</p>
+    <a href="{{ url_for('login') }}">로그인하러 가기</a>
   {% endif %}
 </body>
 </html>

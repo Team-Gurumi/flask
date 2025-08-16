@@ -1,9 +1,6 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from datetime import datetime
-from uuid import uuid4
-import json
 import os
 import requests
 from dotenv import load_dotenv
@@ -81,39 +78,76 @@ def login():
         return redirect(url_for('home'))
     else:
         return "로그인 실패", 401
+    
+# 홈 > 상세보기
+@app.route('/provider/<int:provider_id>', methods=['GET'])
+def provider_detail(provider_id):
+    provider = Provider.query.get_or_404(provider_id)
+    return render_template('prov-detail.html', provider=provider)
 
-# 작업 요청
+# 작업 요청 (Flask → FastAPI 프록시)
 @app.route('/submit_job/<int:provider_id>', methods=['POST'])
 def submit_job(provider_id):
     if 'user_id' not in session:
-        return redirect(url_for('html_login'))
+        return redirect(url_for('login'))
 
-    job_id = str(uuid4())[:8]
     provider = Provider.query.get_or_404(provider_id)
-    os.makedirs('reports', exist_ok=True)
 
-    report_data = {
-        "job_id": job_id,
-        "provider": provider.name,
-        "status": "Running",
-        "start_time": datetime.now().isoformat()
+    # 홈 화면 폼에서 값 수집
+    image = (request.form.get('image') or 'alpine:3.19').strip()
+    script = (request.form.get('script') or '').strip()
+    env_text = (request.form.get('env') or '').strip()
+
+    # "KEY=VALUE" 줄바꿈 파싱
+    env_dict = {}
+    if env_text:
+        for line in env_text.splitlines():
+            line = line.strip()
+            if not line or '=' not in line:
+                continue
+            k, v = line.split('=', 1)
+            env_dict[k.strip()] = v.strip()
+
+    # 간단히 provider.name을 K8S 라벨값으로 사용 (라벨 체계 다르면 이 부분을 매핑)
+    payload = {
+        "image": image,
+        "script": script,
+        "provider_label_value": provider.name,
+        "namespace": "mutual-cloud",
+        "env": env_dict,
+        "backoff_limit": 0,
+        "ttl_seconds_after_finished": 300
     }
 
-    with open(f"reports/{job_id}.json", "w") as f:
-        json.dump(report_data, f)
+    try:
+        resp = requests.post(
+            f"{FASTAPI_BASE_URL}/submit-job",
+            json=payload,
+            timeout=20
+        )
+        resp.raise_for_status()
+        data = resp.json()  # { "job_name": "...", "namespace": "..." }
+    except Exception as e:
+        return f"FastAPI 호출 오류: {e}", 500
 
-    return redirect(url_for('result', job_id=job_id))
+    return redirect(url_for('result', namespace=data["namespace"], job_id=data["job_name"]))
+
 
 # 결과 보기
-@app.route('/result/<job_id>')
-def result(job_id):
+@app.route('/result/<namespace>/<job_id>')
+def result(namespace, job_id):
     try:
-        with open(f"reports/{job_id}.json", "r") as f:
-            report = json.load(f)
-    except FileNotFoundError:
-        return "리포트를 찾을 수 없습니다", 404
+        resp = requests.get(
+            f"{FASTAPI_BASE_URL}/jobs/{namespace}/{job_id}/logs",
+            params={"timeout": FASTAPI_TIMEOUT},
+            timeout=FASTAPI_TIMEOUT + 10
+        )
+        resp.raise_for_status()
+        data = resp.json()  # {"pod": "...", "phase": "Succeeded|Failed|...", "logs": "..."}
+    except Exception as e:
+        return f"FastAPI 로그 조회 오류: {e}", 500
 
-    return render_template('result.html', report=report)
+    return render_template('result.html', ns=namespace, job_id=job_id, result=data)
 
 # 공급자 자원 상태 등록 API
 @app.route('/api/provider/register', methods=['POST'])
