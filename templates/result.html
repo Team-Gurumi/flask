@@ -1,17 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head><title>작업 결과</title></head>
-<body>
-  <h1>작업 리포트</h1>
+<!-- templates/result.html -->
+<h2>작업 결과</h2>
+<p>Namespace: {{ ns }}</p>
+<p>Job: {{ job_id }}</p>
+<p>Pod: {{ result.pod }}</p>
+<p>Phase: <strong>{{ result.phase }}</strong></p>
 
-  {% if report.status == 'Running' %}
-    <p>🔄 작업이 진행 중입니다...</p>
-  {% else %}
-    <p>✅ 작업이 완료되었습니다!</p>
-  {% endif %}
+<h3>Logs</h3>
+<pre style="background:#f5f5f5; padding:12px; border-radius:8px; white-space:pre-wrap;">
+{{ result.logs }}
+</pre>
 
-  <p>작업 ID: {{ report.job_id }}</p>
-  <p>공급자: {{ report.provider }}</p>
-  <p>시작 시간: {{ report.start_time }}</p>
-</body>
-</html>
+<a href="{{ url_for('home') }}">← 홈으로</a>
